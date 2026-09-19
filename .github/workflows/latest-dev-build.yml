@@ -19,7 +19,8 @@ env:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # The project uses the VS 2022 v143 toolset and its MFC libraries.
+    runs-on: windows-2022
     strategy:
       matrix:
         configuration: [Release, Debug]
@@ -30,6 +31,8 @@ jobs:
 
     - name: Add MSBuild to PATH
       uses: microsoft/setup-msbuild@v2
+      with:
+        vs-version: '[17.0,18.0)'
 
     - name: Build solution
       run: msbuild /m /p:Configuration=${{ matrix.configuration }} /p:Platform=Win32 /p:PreferredToolArchitecture=x86 /p:BuildProjectReferences=true /verbosity:normal /p:PRE_RELEASE=PRE_RELEASE ${{ env.SOLUTION_FILE_PATH }}
