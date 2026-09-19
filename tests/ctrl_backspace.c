@@ -1,8 +1,8 @@
 /* Integration test against a running MUSHclient command edit control.
  * Build: winegcc -m64 tests/ctrl_backspace.c -o /tmp/ctrl_backspace.exe
  * Or: cl tests\ctrl_backspace.c user32.lib
- * Usage: ctrl_backspace.exe <command-edit-HWND-in-hex>
- * Use a disposable world with ctrl_backspace_deletes_last_word="y".
+ * Usage: ctrl_backspace.exe [command-edit-HWND-in-hex]
+ * With no argument, finds the supplied ctrl-backspace-test.mcl world.
  * This exercises WM_CHAR directly, the fallback path missed by accelerators.
  */
 #include <windows.h>
@@ -11,6 +11,31 @@
 #include <string.h>
 
 static int failures;
+static HWND test_edit;
+
+static BOOL CALLBACK find_edit(HWND window, LPARAM unused)
+{
+  char cls[64], title[256];
+  (void)unused;
+  GetClassNameA(window, cls, sizeof cls);
+  if (strcmp(cls, "Edit") || GetDlgCtrlID(window) != 59664) return TRUE;
+  GetWindowTextA(GetParent(GetParent(window)), title, sizeof title);
+  if (strstr(title, "ctrl-backspace-test.mcl")) test_edit = window;
+  return TRUE;
+}
+
+static BOOL CALLBACK find_world(HWND window, LPARAM unused)
+{
+  (void)unused;
+  EnumChildWindows(window, find_edit, 0);
+  return TRUE;
+}
+
+static void script(HWND edit, const char *command)
+{
+  SendMessageA(edit, WM_SETTEXT, 0, (LPARAM)command);
+  SendMessageA(edit, WM_CHAR, VK_RETURN, 1);
+}
 
 static void check(HWND edit, const char *name, const char *input,
                   int start, int end, const char *expected, int caret)
@@ -36,11 +61,17 @@ int main(int argc, char **argv)
 {
   HWND edit;
   char cls[64], actual[1024];
-  if (argc != 2) { puts("Usage: ctrl_backspace.exe <edit-HWND-in-hex>"); return 2; }
-  edit = (HWND)(ULONG_PTR)strtoull(argv[1], NULL, 16);
+  if (argc > 2) { puts("Usage: ctrl_backspace.exe [edit-HWND-in-hex]"); return 2; }
+  if (argc == 2)
+    edit = (HWND)(ULONG_PTR)strtoull(argv[1], NULL, 16);
+  else
+    {
+    EnumWindows(find_world, 0);
+    edit = test_edit;
+    }
   if (!IsWindow(edit) || !GetClassNameA(edit, cls, sizeof cls) || strcmp(cls, "Edit") ||
       GetDlgCtrlID(edit) != 59664)
-    { puts("Not a MUSHclient command edit control"); return 2; }
+    { puts("Open tests/ctrl-backspace-test.mcl in MUSHclient first"); return 2; }
 
   check(edit, "previous word", "one two three", 13, 13, "one two", 7);
   check(edit, "only word", "hello", 5, 5, "", 0);
@@ -61,6 +92,19 @@ int main(int argc, char **argv)
   SendMessageA(edit, WM_GETTEXT, sizeof actual, (LPARAM)actual);
   if (strcmp(actual, "a")) { puts("FAIL plain backspace"); failures++; }
   else puts("PASS plain backspace");
+
+  SendMessageA(edit, WM_SETTEXT, 0, (LPARAM)"one two three");
+  SendMessageA(edit, EM_SETSEL, 13, 13);
+  /* ID_REPEAT_LAST_WORD: the same command dispatched by the accelerator. */
+  SendMessageA(GetAncestor(edit, GA_ROOT), WM_COMMAND, MAKEWPARAM(32973, 1), 0);
+  SendMessageA(edit, WM_GETTEXT, sizeof actual, (LPARAM)actual);
+  if (strcmp(actual, "one two")) { puts("FAIL accelerator command"); failures++; }
+  else puts("PASS accelerator command");
+
+  script(edit, "/SetOption('ctrl_backspace_deletes_last_word', 0)");
+  script(edit, "/-- remembered");
+  check(edit, "legacy word recall", "say ", 4, 4, "say remembered", 14);
+  script(edit, "/SetOption('ctrl_backspace_deletes_last_word', 1)");
   SendMessageA(edit, WM_SETTEXT, 0, (LPARAM)"");
   printf("%d failure(s)\n", failures);
   return failures ? 1 : 0;

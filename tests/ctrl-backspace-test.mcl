@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE muclient>
+<muclient>
+<world name="Ctrl Backspace Test" site="127.0.0.1" port="1"
+       connect_method="0" enable_scripts="y" script_language="Lua"
+       script_prefix="/" ctrl_backspace_deletes_last_word="y" />
+</muclient>
