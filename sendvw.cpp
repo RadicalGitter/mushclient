@@ -317,6 +317,15 @@ void CSendView::OnChar(UINT nChar, UINT nRepCnt, UINT nFlags)
 CMUSHclientDoc* pDoc = GetDocument();
 ASSERT_VALID(pDoc);
 
+  // Ctrl+Backspace can arrive as DEL if its keydown was not consumed by
+  // the accelerator table. Do not pass it to the edit control, where it
+  // can appear as a square (or be ignored, depending on the platform).
+  if (nChar == 0x7F)
+    {
+    OnRepeatLastWord ();
+    return;
+    }
+
 	if (nChar == VK_RETURN)
   	{
 

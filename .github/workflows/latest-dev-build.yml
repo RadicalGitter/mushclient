@@ -2,7 +2,7 @@ name: Build and Deploy MUSHclient
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, fix/ctrl-backspace ]
   pull_request:
     branches: [ master ]
 
